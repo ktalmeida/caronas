@@ -11,6 +11,7 @@ class Regex(object):
     def __init__(self):
         self.date =\
             "^[0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M"
+        self.user = "-\s(.*?)\:"
 
 
 class GroupHandler(object):
