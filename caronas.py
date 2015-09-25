@@ -14,7 +14,12 @@ class Regex(object):
         self.date =\
             r"^([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M)"
         self.user_name = r"(-(.*?\:))"
-        self.user_name_action = "(-\s(.*?))‬\s"
+        self.user_name_action = r"-\s(.*?)‬\s(\w+)"
+        self.user_actions = {
+            "adicionou: ""add", 
+            "removeu": "remove", 
+            "saiu": "leave",
+            "criou" : "create"}
 
     def verify_match(self, line, regex_string):
         """
@@ -57,7 +62,7 @@ class Regex(object):
 
     def get_user_by_message(self, line):
         """
-        Based on message pattern (date - user_name: message), retrieve
+        Based on message pattern (date - user_name: message), retrieves
         user data
         """
         temp_user = None
@@ -66,6 +71,17 @@ class Regex(object):
         if user_name is not None and message_date is not None:
             temp_user = User(user_name, message_date)
         return temp_user
+
+    def get_user_by_action(self, line):
+        """
+        Based on action patter (date - user action), retrieves user data
+        """
+        temp_user = None
+        user_name = self.match_name_in_action(line)
+        message_date = self.match_date(line)
+        user_action = self.match_action(line)
+        if user_name is not None and message_date is not None:
+            temp_user = User(user_name, message_date)
 
     def match_name_in_message(self, line):
         """Matches an user name in a message"""
@@ -90,41 +106,72 @@ class Regex(object):
         if match:
             return match.group(1)
 
+    def match_action(self):
+        """Matchs an action and converts it to code action name"""
+        regexp = self.user_action
+        match = self.return_match(line, regexp)
+        if match:
+            action = match.group(2)
+            if action in self.user_actions:
+                return self.user_actions[action]
+
 
 class GroupHandler(object):
     """
     This class will read the group file and create a list of users and measure
     their activity data
     """
+
     def __init__(self, filename, regex):
         self.group_file = open(filename)
         self.regex = regex
         self.users = {}
+        self.total_messages = 0
+        self.total_file_lines = 0
 
     def parse_file(self):
         lines = self.group_file.readlines()
+        self.total_file_lines = 0
+        self.total_messages = 0
+        self.users = {}
         temp_user = None
         already_added_users = None
         for line in lines:
+            self.total_file_lines += 1
             if self.regex.has_date(line):
                 # Can be a message or an user action
                 if self.regex.has_message(line):
                     # is an user message
                     temp_user = self.regex.get_user_by_message(line)
+                    self.total_messages += 1
                 else:
                     # is an action
-                    continue
+                    temp_user = self.regex.get_user_by_action(line)
             else:
                 # Is a message from the last user who sent a message
-                continue
+                self.total_messages += 1
             already_added_users = self.users.keys()
             if temp_user is not None:
                 if temp_user.id not in already_added_users:
                     self.users[temp_user.id] = temp_user
                 else:
                     self.users[temp_user.id].number_of_messages += 1
+        self.users = sorted(g.users.values(), key=operator.attrgetter(
+            'number_of_messages'), reverse=True)
+        self.show_results()
+    
+    def show_results(self):
+        print "------------------"
+        print "----RESULTADO-----"
+        print "------------------"
+        print u"Linhas do arquivo: %i \nTotal de mensagens: %i, Total de ações %i" \
+            % (self.total_file_lines,self.total_messages,0)
+
+    def __str__(self):
+        users_string = ""
         for user in self.users:
-            print self.users[user]
+            users_string += str(user)
+        return users_string
 
 class User(object):
     """
