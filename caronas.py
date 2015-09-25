@@ -1,6 +1,7 @@
 """
 This module is responsible for counting messages from a given text file,
 following whatsapp's conversation format, to count group activity
+([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M)|(‪.*‬)|(-.*\:\s)
 """
 
 import re  #  for regex matching
@@ -11,9 +12,9 @@ class Regex(object):
     """
     def __init__(self):
         self.date =\
-            "^([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M)"
-            self.user_name = "(-\s(.*?)\:)"
-        self.user_name_action = "(- ‪\+[0-9]{2}\s[0-9]{2}\s[0-9]{5}-[0-9]{4}(?!.\:))"
+            r"^([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M)"
+        self.user_name = r"(-(.*?\:))"
+        self.user_name_action = "(-\s(.*?))‬\s"
 
     def verify_match(self, line, regex_string):
         """
@@ -21,9 +22,16 @@ class Regex(object):
         """
         parser = re.compile(regex_string)
         match = parser.search(line)
-        if match is not None:
+        if match:
             return True
         return False
+
+    def return_match(self, line, regexp):
+        """Returns a match, given a regexp"""
+        parser = re.compile(regexp)
+        match = parser.search(line)
+        return match
+
     def has_date(self, line):
         """
         Returns true if current line has a date
@@ -47,7 +55,40 @@ class Regex(object):
         """
         return self.verify_match(line, self.user_name_action)
 
-    def get_user_by_message(line):
+    def get_user_by_message(self, line):
+        """
+        Based on message pattern (date - user_name: message), retrieve
+        user data
+        """
+        temp_user = None
+        user_name = self.match_name_in_message(line)
+        message_date = self.match_date(line)
+        if user_name is not None and message_date is not None:
+            temp_user = User(user_name, message_date)
+        return temp_user
+
+    def match_name_in_message(self, line):
+        """Matches an user name in a message"""
+        regexp = self.user_name
+        match = self.return_match(line, regexp)
+        if match:
+            # Must remove some trashy and invisible 
+            # characters that whatsapp inserts in every message
+            return match.group(1).split('+', 1)[-1].split('\xe2\x80\xac')[0]  
+
+    def match_date(self, line):
+        """Matches a date"""
+        regexp = self.date
+        match = self.return_match(line, regexp)
+        if match:
+            return match.group(1)
+
+    def match_name_in_action(self, line):
+        """Matches an user name in an action"""
+        regexp = self.user_name
+        match = self.return_match(line, regexp)
+        if match:
+            return match.group(1)
 
 
 class GroupHandler(object):
@@ -58,11 +99,12 @@ class GroupHandler(object):
     def __init__(self, filename, regex):
         self.group_file = open(filename)
         self.regex = regex
-        self.users = []
+        self.users = {}
 
     def parse_file(self):
         lines = self.group_file.readlines()
         temp_user = None
+        already_added_users = None
         for line in lines:
             if self.regex.has_date(line):
                 # Can be a message or an user action
@@ -71,20 +113,34 @@ class GroupHandler(object):
                     temp_user = self.regex.get_user_by_message(line)
                 else:
                     # is an action
+                    continue
             else:
                 # Is a message from the last user who sent a message
+                continue
+            already_added_users = self.users.keys()
+            if temp_user is not None:
+                if temp_user.id not in already_added_users:
+                    self.users[temp_user.id] = temp_user
+                else:
+                    self.users[temp_user.id].number_of_messages += 1
+        for user in self.users:
+            print self.users[user]
 
 class User(object):
     """
     This class represents a group user
     """
     def __init__(self):
-        self.id = ""
+        self.id = u""
         self.last_message_date = ""
         self.number_of_messages = 0
         self.actions = {"add": 0, "remove": 0}
 
-    def __init__(self, id, last_message_date, number_of_messages):
+    def __init__(self, id, last_message_date):
         self.id = id
         self.last_message_date = last_message_date
-        self.number_of_messages = number_of_messages
+        self.number_of_messages = 0
+
+    def __str__(self):
+        return \
+            "{ user: " + self.id + "\n" + ("messages: %i" % self.number_of_messages) + "}\n"
