@@ -6,7 +6,6 @@ using a reguler expression handler
 
 import operator
 from user import User
-from regex_handler import Regex
 
 
 class GroupHandler(object):

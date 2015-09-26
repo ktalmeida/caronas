@@ -7,6 +7,7 @@ import sys
 import json
 
 from group_handler import GroupHandler
+from regex_handler import Regex
 
 if __name__ == '__main__':
     file_name = 'group_chat.txt'
