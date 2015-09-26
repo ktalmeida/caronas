@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 This module is responsible for counting messages from a given text file,
 following whatsapp's conversation format, to count group activity
@@ -5,6 +6,8 @@ following whatsapp's conversation format, to count group activity
 """
 
 import re  #  for regex matching
+import operator
+import json 
 
 class Regex(object):
     """
@@ -14,11 +17,14 @@ class Regex(object):
         self.date =\
             r"^([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M)"
         self.user_name = r"(-(.*?\:))"
-        self.user_name_action = r"-\s(.*?)‬\s(\w+)"
+        self.user_action = \
+            r"(-\s.*)(adicionou|alterado|criou|foi removido|entrou|saiu|removeu)"
         self.user_actions = {
-            "adicionou: ""add", 
-            "removeu": "remove", 
+            "adicionou": "add", 
+            "foi removido": "removed",
+            "removeu": "removed", 
             "saiu": "leave",
+            "alterado": "alter",
             "criou" : "create"}
 
     def verify_match(self, line, regex_string):
@@ -82,6 +88,8 @@ class Regex(object):
         user_action = self.match_action(line)
         if user_name is not None and message_date is not None:
             temp_user = User(user_name, message_date)
+            temp_user.actions[action] = 1
+        return temp_user, user_action
 
     def match_name_in_message(self, line):
         """Matches an user name in a message"""
@@ -106,7 +114,7 @@ class Regex(object):
         if match:
             return match.group(1)
 
-    def match_action(self):
+    def match_action(self, line):
         """Matchs an action and converts it to code action name"""
         regexp = self.user_action
         match = self.return_match(line, regexp)
@@ -123,19 +131,21 @@ class GroupHandler(object):
     """
 
     def __init__(self, filename, regex):
-        self.group_file = open(filename)
+        self.filename = filename
         self.regex = regex
         self.users = {}
         self.total_messages = 0
         self.total_file_lines = 0
 
     def parse_file(self):
-        lines = self.group_file.readlines()
+        lines = open(self.filename).readlines()
         self.total_file_lines = 0
         self.total_messages = 0
+        self.total_actions = 0
         self.users = {}
         temp_user = None
         already_added_users = None
+        print "\rLendo o arquivo... Aguarde"
         for line in lines:
             self.total_file_lines += 1
             if self.regex.has_date(line):
@@ -143,10 +153,12 @@ class GroupHandler(object):
                 if self.regex.has_message(line):
                     # is an user message
                     temp_user = self.regex.get_user_by_message(line)
+                    temp_user.number_of_messages = 1
                     self.total_messages += 1
                 else:
                     # is an action
-                    temp_user = self.regex.get_user_by_action(line)
+                    self.total_actions += 1
+                    temp_user, curr_action = self.regex.get_user_by_action(line)
             else:
                 # Is a message from the last user who sent a message
                 self.total_messages += 1
@@ -154,18 +166,22 @@ class GroupHandler(object):
             if temp_user is not None:
                 if temp_user.id not in already_added_users:
                     self.users[temp_user.id] = temp_user
+                curr_user = self.users[temp_user.id]
+                curr_user.last_message_date = temp_user.last_message_date
+                if temp_user.number_of_messages > 0:
+                    curr_user.number_of_messages += 1
                 else:
-                    self.users[temp_user.id].number_of_messages += 1
-        self.users = sorted(g.users.values(), key=operator.attrgetter(
+                    curr_user.actions[curr_action] += 1
+        self.users = sorted(self.users.values(), key=operator.attrgetter(
             'number_of_messages'), reverse=True)
         self.show_results()
     
     def show_results(self):
         print "------------------"
-        print "----RESULTADO-----"
+        print "----RESULTADOS-----"
         print "------------------"
-        print u"Linhas do arquivo: %i \nTotal de mensagens: %i, Total de ações %i" \
-            % (self.total_file_lines,self.total_messages,0)
+        print "Linhas do arquivo: %i \nTotal de mensagens: %i, Total de ações %i" \
+            % (self.total_file_lines,self.total_messages,self.total_actions)
 
     def __str__(self):
         users_string = ""
@@ -181,13 +197,30 @@ class User(object):
         self.id = u""
         self.last_message_date = ""
         self.number_of_messages = 0
-        self.actions = {"add": 0, "remove": 0}
+        self.actions = {
+            "add": 0, "removed": 0, "create":0, 
+            "left":0, "leave": 0, "alter":0}
 
     def __init__(self, id, last_message_date):
         self.id = id
         self.last_message_date = last_message_date
         self.number_of_messages = 0
+        self.actions = {
+            "add": 0, "removed": 0, "create":0, 
+            "left":0, "leave": 0, "alter":0}
+
 
     def __str__(self):
         return \
             "{ user: " + self.id + "\n" + ("messages: %i" % self.number_of_messages) + "}\n"
+
+
+if __name__ == '__main__':
+    p = GroupHandler('group_chat.txt', Regex())
+    p.parse_file()
+    for user in p.users:
+        print "user = %s " % user.id
+        print "last_activity = %s" % user.last_message_date
+        print "messages = %i" % user.number_of_messages 
+        print "actions = " +  json.dumps(user.actions)
+        print "XXXXXXXXX"
