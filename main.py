@@ -10,9 +10,14 @@ from group_handler import GroupHandler
 from regex_handler import Regex
 
 if __name__ == '__main__':
-    file_name = 'group_chat.txt'
+    # Searching in current directory for txt file
+    files = [f for f in os.listdir('.') if os.path.isfile(f)]
+    for f in files:
+        if ".txt" in f:  # If file has a txt extension
+            file_name = f
+            break
     if not os.path.isfile(file_name):
-        print "Erro: Não consigo achar o arquivo: %s =(" % file_name
+        print "Erro: Não consigo achar um arquivo txt =(" % file_name
         sys.exit()
     group = GroupHandler(file_name, Regex())
     group.parse_file()
