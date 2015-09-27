@@ -5,6 +5,7 @@ This class is responsible for parsing a line in whatsapp conversation history
 
 import re  # For regex matching
 from user import User
+import unicodedata
 
 
 class Regex(object):
@@ -14,14 +15,15 @@ class Regex(object):
     def __init__(self):
         self.date =\
             r"^([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M)"
-        self.user_name = r"(-(.*?\:))"
+        self.user_name = r"(-(.*?)\:)"
         self.user_action = \
-            r"(-\s.*)(adicionou|alterado|criou|foi removido|entrou|saiu|removeu)"
+            r"-\s(.*)\s(adicionou|alterado|criou|foi removido|entrou|saiu|removeu)"
+        self.affected_user = r"removeu\s‪\+(.*)‬"
         self.user_actions = {
             "adicionou": "add",
             "foi removido": "removed",
-            "removeu": "removed",
-            "saiu": "leave",
+            "removeu": "remove",
+            "saiu": "left",
             "alterado": "alter",
             "criou": "create"}
 
@@ -81,13 +83,22 @@ class Regex(object):
         Based on action patter (date - user action), retrieves user data
         """
         temp_user = None
+        affected_user = None
         user_name = self.match_name_in_action(line)
         message_date = self.match_date(line)
         user_action = self.match_action(line)
+        if user_action == "remove":
+            affected_user = self.match_affected_user(line)
         if user_name is not None and message_date is not None:
             temp_user = User(user_name, message_date)
-            temp_user.actions[user_action] = 1
-        return temp_user, user_action
+        return temp_user, user_action, affected_user
+
+    def match_affected_user(self, line):
+        """Gets affected user"""
+        regexp = self.affected_user
+        match = self.return_match(line, regexp)
+        if match:
+            return match.group(1)
 
     def match_name_in_message(self, line):
         """Matches an user name in a message"""
@@ -96,7 +107,7 @@ class Regex(object):
         if match:
             # Must remove some trashy and invisible
             # characters that whatsapp inserts in every message
-            return match.group(1).split('+', 1)[-1].split('\xe2\x80\xac')[0]
+            return self.remove_special_characters(match.group(2))
 
     def match_date(self, line):
         """Matches a date"""
@@ -107,10 +118,10 @@ class Regex(object):
 
     def match_name_in_action(self, line):
         """Matches an user name in an action"""
-        regexp = self.user_name
+        regexp = self.user_action
         match = self.return_match(line, regexp)
         if match:
-            return match.group(1)
+            return self.remove_special_characters(match.group(1))
 
     def match_action(self, line):
         """Matchs an action and converts it to code action name"""
@@ -118,5 +129,17 @@ class Regex(object):
         match = self.return_match(line, regexp)
         if match:
             action = match.group(2)
-            if action in self.user_actions:
+            if action in self.user_actions.keys():
                 return self.user_actions[action]
+
+    def remove_special_characters(self, string):
+        clean_string = string
+        if '‬' in string:
+            clean_string = string.replace('‬', "")
+        if "+" in string:
+            clean_string = string.replace("+", "")
+        return self.remove_control_characters(
+            clean_string.lstrip().rstrip().decode('utf-8'))
+
+    def remove_control_characters(self, s):
+        return "".join(ch for ch in s if unicodedata.category(ch)[0] != "C")

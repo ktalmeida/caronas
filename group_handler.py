@@ -22,6 +22,7 @@ class GroupHandler(object):
         self.total_file_lines = 0
         self.total_messages = 0
         self.total_actions = 0
+        self.total_gone = 0
 
     def parse_file(self):
         lines = open(self.filename).readlines()
@@ -29,36 +30,48 @@ class GroupHandler(object):
         temp_user = None
         already_added_users = None
         print "\rLendo o arquivo... Aguarde"
+        self.teste = []
         for line in lines:
             self.total_file_lines += 1
             if self.regex.has_date(line):
                 # Can be a message or an user action
+                line_type = "message"
                 if self.regex.has_message(line):
                     # is an user message
                     temp_user = self.regex.get_user_by_message(line)
-                    temp_user.number_of_messages = 1
                     self.total_messages += 1
                 else:
                     # is an action
-                    self.total_actions += 1
-                    temp_user, curr_action = \
+                    temp_user, curr_action, affected_user = \
                         self.regex.get_user_by_action(line)
+                    if curr_action not in ("left", "removed", "alter"):
+                        self.total_actions += 1
+                    else:
+                        self.total_gone += 1
+                    line_type = "action"
+                    self.total_file_lines
             else:
                 # Is a message from the last user who sent a message
                 self.total_messages += 1
             already_added_users = self.users.keys()
             if temp_user is not None:
+                self.teste.append(temp_user.id)
                 if temp_user.id not in already_added_users:
                     self.users[temp_user.id] = temp_user
                 curr_user = self.users[temp_user.id]
                 curr_user.last_message_date = temp_user.last_message_date
-                if temp_user.number_of_messages > 0:
+                if line_type != "action":
                     curr_user.number_of_messages += 1
                 else:
                     curr_user.actions[curr_action] += 1
+                if curr_user.has_left():
+                    del self.users[curr_user.id]
+                if curr_user.has_removed() and affected_user is not None and\
+                        affected_user in self.users.keys():
+                    del self.users[affected_user]
+
         self.users = sorted(self.users.values(), key=operator.attrgetter(
             'number_of_messages'), reverse=True)
-        self.show_results()
 
     def show_results(self):
         """Print results in terminal"""
@@ -68,6 +81,14 @@ class GroupHandler(object):
         print "Linhas do arquivo: %i" % self.total_file_lines
         print "Total de mensagens: %i, Total de ações %i" \
             % (self.total_messages, self.total_actions)
+        print "Total de membros que saíram: %i" % self.total_gone
+        print "Total de membros atualmente: %i" % len(self.users)
+
+    def show_users(self):
+        string = "["
+        for user in self.users:
+            string += str(user)
+        string = "]"
 
     def __str__(self):
         users_string = ""

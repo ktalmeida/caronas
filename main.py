@@ -21,9 +21,7 @@ if __name__ == '__main__':
         sys.exit()
     group = GroupHandler(file_name, Regex())
     group.parse_file()
+    group.show_results()
+    # print group.teste
     for user in group.users:
-        print "user = %s " % user.id
-        print "last_activity = %s" % user.last_message_date
-        print "messages = %i" % user.number_of_messages
-        print "actions = " + json.dumps(user.actions)
-        print "XXXXXXXXX"
+        print user
