@@ -14,7 +14,7 @@ class Regex(object):
     """
     def __init__(self):
         self.date =\
-            r"^([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M)"
+            r"^([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2} (A|P){1}M)|^([0-9]{2}/[0-9]{2}/[0-9]{4}, [0-9]{1,2}:[0-9]{1,2})"
         self.user_name = r"(-(.*?)\:)"
         self.user_action = \
             r"-\s(.*)\s(adicionou|alterado|criou|foi removido|entrou|saiu|removeu)"
@@ -114,7 +114,7 @@ class Regex(object):
         regexp = self.date
         match = self.return_match(line, regexp)
         if match:
-            return match.group(1)
+            return match.group()
 
     def match_name_in_action(self, line):
         """Matches an user name in an action"""

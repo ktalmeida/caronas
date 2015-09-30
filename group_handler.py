@@ -30,7 +30,6 @@ class GroupHandler(object):
         temp_user = None
         already_added_users = None
         print "\rLendo o arquivo... Aguarde"
-        self.teste = []
         for line in lines:
             self.total_file_lines += 1
             if self.regex.has_date(line):
@@ -55,7 +54,6 @@ class GroupHandler(object):
                 self.total_messages += 1
             already_added_users = self.users.keys()
             if temp_user is not None:
-                self.teste.append(temp_user.id)
                 if temp_user.id not in already_added_users:
                     self.users[temp_user.id] = temp_user
                 curr_user = self.users[temp_user.id]

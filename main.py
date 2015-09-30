@@ -4,7 +4,6 @@ Main function, wrapping everything
 """
 import os.path
 import sys
-import json
 
 from group_handler import GroupHandler
 from regex_handler import Regex
