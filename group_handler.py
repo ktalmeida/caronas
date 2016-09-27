@@ -6,7 +6,7 @@ using a reguler expression handler
 
 import operator
 from user import User
-
+import datetime
 
 class GroupHandler(object):
     """
@@ -68,8 +68,10 @@ class GroupHandler(object):
                         affected_user in self.users.keys():
                     del self.users[affected_user]
 
-        self.users = sorted(self.users.values(), key=operator.attrgetter(
-            'number_of_messages'), reverse=True)
+        self.users = sorted(
+            self.users.values(), 
+            key=lambda x: datetime.datetime.strptime(
+                x.last_message_date, '%d/%m/%y, %H:%M'), reverse=False)
 
     def show_results(self):
         """Print results in terminal"""
